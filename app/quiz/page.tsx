@@ -77,16 +77,6 @@ export default function QuizPage() {
       ...prev,
       [questionId]: value,
     }));
-
-    // Auto-advance to next question after a short delay
-    setTimeout(() => {
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(currentQuestionIndex + 1);
-      } else {
-        // Quiz complete, navigate to results
-        handleComplete();
-      }
-    }, 500);
   };
 
   const handleComplete = () => {
