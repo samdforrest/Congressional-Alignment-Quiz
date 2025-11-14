@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import QuizQuestion from '@/components/QuizQuestion';
 import ProgressBar from '@/components/ProgressBar';
+import { fetchQuestions, type QuestionsResponse } from '@/lib/api';
 
 interface Question {
   id: number;
@@ -17,67 +18,65 @@ interface Question {
 
 interface Answer {
   questionId: number;
-  optionId: number;
   value: number;
 }
 
 export default function QuizPage() {
   const router = useRouter();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<Answer[]>([]);
+  const [answers, setAnswers] = useState<{ [questionId: number]: number }>({});
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // TODO: Replace with actual API call to fetch questions
-    // For now, using mock questions
-    const mockQuestions: Question[] = [
-      {
-        id: 1,
-        text: 'What is your view on healthcare policy?',
-        options: [
-          { id: 1, text: 'Support universal healthcare', value: 5 },
-          { id: 2, text: 'Support public option', value: 3 },
-          { id: 3, text: 'Support market-based solutions', value: 1 },
-        ],
-      },
-      {
-        id: 2,
-        text: 'What is your position on climate change?',
-        options: [
-          { id: 4, text: 'Urgent action needed', value: 5 },
-          { id: 5, text: 'Moderate regulations', value: 3 },
-          { id: 6, text: 'Minimal government intervention', value: 1 },
-        ],
-      },
-      {
-        id: 3,
-        text: 'What is your view on taxation?',
-        options: [
-          { id: 7, text: 'Increase taxes on wealthy', value: 5 },
-          { id: 8, text: 'Maintain current rates', value: 3 },
-          { id: 9, text: 'Reduce taxes across the board', value: 1 },
-        ],
-      },
-    ];
+    async function loadQuestions() {
+      try {
+        const data: QuestionsResponse = await fetchQuestions();
+        
+        // Convert backend format to frontend format
+        const formattedQuestions: Question[] = Object.entries(data.questions)
+          .map(([id, text]) => {
+            const questionId = parseInt(id);
+            // Create options from answer scale (-3 to 3)
+            // Note: JSON keys are strings, so we need to parse them
+            const options = Object.entries(data.answer_scale)
+              .map(([valueStr, label]) => {
+                const value = parseInt(valueStr);
+                return {
+                  id: questionId * 10 + value + 3, // Unique ID (shift by 3 to avoid negatives)
+                  text: label as string,
+                  value: value,
+                };
+              })
+              .sort((a, b) => b.value - a.value); // Sort from strongly agree to strongly disagree
+            
+            return {
+              id: questionId,
+              text,
+              options,
+            };
+          })
+          .sort((a, b) => a.id - b.id); // Sort by question ID
 
-    setQuestions(mockQuestions);
-    setLoading(false);
+        setQuestions(formattedQuestions);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error loading questions:', err);
+        setError('Failed to load questions. Please make sure the backend server is running.');
+        setLoading(false);
+      }
+    }
+
+    loadQuestions();
   }, []);
 
   const handleAnswer = (questionId: number, optionId: number, value: number) => {
-    const newAnswer: Answer = { questionId, optionId, value };
-    const updatedAnswers = [...answers];
-    
-    // Check if answer already exists for this question
-    const existingIndex = updatedAnswers.findIndex(a => a.questionId === questionId);
-    if (existingIndex >= 0) {
-      updatedAnswers[existingIndex] = newAnswer;
-    } else {
-      updatedAnswers.push(newAnswer);
-    }
-    
-    setAnswers(updatedAnswers);
+    // Update answers in the format expected by backend: {questionId: value}
+    setAnswers(prev => ({
+      ...prev,
+      [questionId]: value,
+    }));
 
     // Auto-advance to next question after a short delay
     setTimeout(() => {
@@ -133,12 +132,29 @@ export default function QuizPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="text-xl font-semibold mb-2 text-red-600 dark:text-red-400">
+            Error Loading Quiz
+          </div>
+          <div className="text-gray-600 dark:text-gray-400 mb-4">{error}</div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const currentQuestion = questions[currentQuestionIndex];
-  const answeredCount = answers.filter(a => 
-    questions.some(q => q.id === a.questionId)
-  ).length;
+  const answeredCount = Object.keys(answers).length;
   const isLastQuestion = currentQuestionIndex === questions.length - 1;
-  const isCurrentQuestionAnswered = answers.some(a => a.questionId === currentQuestion.id);
+  const isCurrentQuestionAnswered = currentQuestion && answers[currentQuestion.id] !== undefined;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4">
@@ -150,6 +166,7 @@ export default function QuizPage() {
           onAnswer={handleAnswer}
           currentQuestion={currentQuestionIndex + 1}
           totalQuestions={questions.length}
+          selectedValue={answers[currentQuestion.id]}
         />
 
         <div className="flex justify-between mt-8 max-w-2xl mx-auto">

@@ -3,6 +3,7 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import ResultCard from '@/components/ResultCard';
+import { submitAnswers } from '@/lib/api';
 
 interface Coalition {
   id: string;
@@ -12,57 +13,76 @@ interface Coalition {
   percentage: number;
 }
 
+// Faction descriptions (you can move this to a separate file or fetch from backend)
+const FACTION_DESCRIPTIONS: { [key: string]: string } = {
+  'Progressive Caucus': 'You align with progressive policies focused on social justice, climate action, and economic equality.',
+  'New Democrat Coalition': 'You support pro-business policies, innovation, and pragmatic progressive solutions.',
+  'Blue Dog Coalition': 'You prefer fiscally conservative and socially moderate approaches to governance.',
+  'Mainstream Democrats': 'You align with traditional Democratic values and party positions.',
+  'Freedom Caucus': 'You support limited government, fiscal conservatism, and traditional values.',
+  'Republican Study Committee': 'You align with conservative principles and free-market economics.',
+  'Main Street Caucus': 'You prefer pragmatic, business-friendly conservative solutions.',
+  'Problem Solvers Caucus': 'You value bipartisanship, compromise, and finding common ground.',
+};
+
 export default function ResultsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [results, setResults] = useState<Coalition[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Get answers from URL params or localStorage
     const answersParam = searchParams.get('answers');
-    const answers = answersParam 
-      ? JSON.parse(decodeURIComponent(answersParam))
-      : JSON.parse(localStorage.getItem('quizAnswers') || '[]');
-
-    if (answers.length === 0) {
+    let answers: { [questionId: number]: number } = {};
+    
+    try {
+      if (answersParam) {
+        answers = JSON.parse(decodeURIComponent(answersParam));
+      } else {
+        const stored = localStorage.getItem('quizAnswers');
+        if (stored) {
+          answers = JSON.parse(stored);
+        }
+      }
+    } catch (err) {
+      console.error('Error parsing answers:', err);
       router.push('/');
       return;
     }
 
-    // Calculate results (this will be replaced with API call later)
+    if (Object.keys(answers).length === 0) {
+      router.push('/');
+      return;
+    }
+
+    // Calculate results using backend API
     calculateResults(answers);
   }, [searchParams, router]);
 
-  const calculateResults = async (answers: Array<{ questionId: number; value: number }>) => {
-    // TODO: Replace with actual API call to backend
-    // For now, mock results
-    const mockResults: Coalition[] = [
-      {
-        id: '1',
-        name: 'Progressive Coalition',
-        description: 'You align with progressive policies focused on social justice, climate action, and economic equality.',
-        score: 85,
-        percentage: 85,
-      },
-      {
-        id: '2',
-        name: 'Moderate Coalition',
-        description: 'You prefer pragmatic solutions and bipartisan approaches to governance.',
-        score: 60,
-        percentage: 60,
-      },
-      {
-        id: '3',
-        name: 'Conservative Coalition',
-        description: 'You support traditional values, limited government, and free-market principles.',
-        score: 30,
-        percentage: 30,
-      },
-    ].sort((a, b) => b.score - a.score);
+  const calculateResults = async (answers: { [questionId: number]: number }) => {
+    try {
+      const response = await submitAnswers(answers);
+      
+      // Convert backend response to frontend format
+      const formattedResults: Coalition[] = Object.entries(response.scores)
+        .map(([name, score]) => ({
+          id: name.toLowerCase().replace(/\s+/g, '-'),
+          name,
+          description: FACTION_DESCRIPTIONS[name] || `You align with the ${name}.`,
+          score: Math.round(score),
+          percentage: Math.round(score),
+        }))
+        .sort((a, b) => b.score - a.score); // Sort by score descending
 
-    setResults(mockResults);
-    setLoading(false);
+      setResults(formattedResults);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error calculating results:', err);
+      setError('Failed to calculate results. Please make sure the backend server is running.');
+      setLoading(false);
+    }
   };
 
   const handleRestart = () => {
@@ -76,6 +96,25 @@ export default function ResultsPage() {
         <div className="text-center">
           <div className="text-xl font-semibold mb-2">Calculating your results...</div>
           <div className="text-gray-600 dark:text-gray-400">Please wait</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="text-xl font-semibold mb-2 text-red-600 dark:text-red-400">
+            Error Calculating Results
+          </div>
+          <div className="text-gray-600 dark:text-gray-400 mb-4">{error}</div>
+          <button
+            onClick={() => router.push('/')}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Return to Home
+          </button>
         </div>
       </div>
     );

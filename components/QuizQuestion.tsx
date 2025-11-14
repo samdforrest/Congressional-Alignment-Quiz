@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface QuizQuestionProps {
   question: {
@@ -15,6 +15,7 @@ interface QuizQuestionProps {
   onAnswer: (questionId: number, optionId: number, value: number) => void;
   currentQuestion: number;
   totalQuestions: number;
+  selectedValue?: number;
 }
 
 export default function QuizQuestion({
@@ -22,8 +23,20 @@ export default function QuizQuestion({
   onAnswer,
   currentQuestion,
   totalQuestions,
+  selectedValue,
 }: QuizQuestionProps) {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+
+  // Reset selection when question changes
+  useEffect(() => {
+    if (selectedValue !== undefined) {
+      // Find the option ID that matches the selected value
+      const matchingOption = question.options.find(opt => opt.value === selectedValue);
+      setSelectedOption(matchingOption?.id || null);
+    } else {
+      setSelectedOption(null);
+    }
+  }, [question.id, selectedValue, question.options]);
 
   const handleOptionSelect = (optionId: number, value: number) => {
     setSelectedOption(optionId);
