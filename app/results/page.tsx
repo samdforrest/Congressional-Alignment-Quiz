@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import ResultCard from '@/components/ResultCard';
 import { submitAnswers } from '@/lib/api';
 
@@ -25,7 +25,7 @@ const FACTION_DESCRIPTIONS: { [key: string]: string } = {
   'Problem Solvers Caucus': 'You value bipartisanship, compromise, and finding common ground.',
 };
 
-export default function ResultsPage() {
+function ResultsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [results, setResults] = useState<Coalition[]>([]);
@@ -148,6 +148,23 @@ export default function ResultsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResultsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="text-center">
+            <div className="text-xl font-semibold mb-2">Loading results...</div>
+            <div className="text-gray-600 dark:text-gray-400">Please wait</div>
+          </div>
+        </div>
+      }
+    >
+      <ResultsContent />
+    </Suspense>
   );
 }
 

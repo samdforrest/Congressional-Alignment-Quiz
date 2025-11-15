@@ -1,22 +1,33 @@
 #FASTAPI application
 # main.py
 
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Dict
+from typing import Dict, List
 from quiz_data import QUESTIONS, FACTIONS
 from scoring import calculate_scores, get_top_factions
 
 app = FastAPI(title="Caucus Compass API")
 
 # Configure CORS to allow requests from Next.js frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# In production, set ALLOWED_ORIGINS environment variable (comma-separated)
+# Example: ALLOWED_ORIGINS=https://your-app.vercel.app,https://your-app.railway.app
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+if allowed_origins_env:
+    # Parse comma-separated origins from environment variable
+    allowed_origins: List[str] = [origin.strip() for origin in allowed_origins_env.split(",")]
+else:
+    # Default to localhost for development
+    allowed_origins = [
         "http://localhost:3000",  # Next.js dev server
         "http://127.0.0.1:3000",
-    ],
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
