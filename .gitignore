@@ -51,3 +51,4 @@ vercel.json
 DEPLOYMENT.md
 .vercelignore
 CORS_FIX.md
+DEBUG_CORS.md
