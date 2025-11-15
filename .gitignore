@@ -50,3 +50,4 @@ __pycache__/
 vercel.json
 DEPLOYMENT.md
 .vercelignore
+CORS_FIX.md

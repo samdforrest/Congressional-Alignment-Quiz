@@ -14,16 +14,20 @@ app = FastAPI(title="Caucus Compass API")
 # Configure CORS to allow requests from Next.js frontend
 # In production, set ALLOWED_ORIGINS environment variable (comma-separated)
 # Example: ALLOWED_ORIGINS=https://your-app.vercel.app,https://your-app.railway.app
+# For Vercel preview deployments, include all your preview URLs or use: https://*.vercel.app (if supported)
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
 if allowed_origins_env:
     # Parse comma-separated origins from environment variable
-    allowed_origins: List[str] = [origin.strip() for origin in allowed_origins_env.split(",")]
+    allowed_origins: List[str] = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
 else:
     # Default to localhost for development
     allowed_origins = [
         "http://localhost:3000",  # Next.js dev server
         "http://127.0.0.1:3000",
     ]
+
+# Log allowed origins for debugging
+print(f"CORS allowed origins: {allowed_origins}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,7 +47,11 @@ class QuizSubmission(BaseModel):
 @app.get("/")
 def root():
     """Health check endpoint."""
-    return {"status": "ok", "message": "Caucus Compass API is running"}
+    return {
+        "status": "ok", 
+        "message": "Caucus Compass API is running",
+        "allowed_origins": allowed_origins if os.getenv("ALLOWED_ORIGINS") else "localhost only (development mode)"
+    }
 
 @app.get("/questions")
 def get_questions():
